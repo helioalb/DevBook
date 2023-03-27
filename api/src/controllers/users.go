@@ -1,11 +1,13 @@
 package controllers
 
 import (
+	"api/src/authentication"
 	"api/src/database"
 	"api/src/models"
 	"api/src/repositories"
 	"api/src/responses"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -96,9 +98,20 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	userId, err := strconv.ParseUint(params["userId"], 10, 64)
+	userID, err := strconv.ParseUint(params["userId"], 10, 64)
 	if err != nil {
 		responses.Error(w, http.StatusBadRequest, err)
+		return
+	}
+
+	userIDFromToken, err := authentication.ExtractUserId(r)
+	if err != nil {
+		responses.Error(w, http.StatusUnauthorized, err)
+		return
+	}
+
+	if userID != userIDFromToken {
+		responses.Error(w, http.StatusForbidden, errors.New("Não é possível atualizar um usuário que não seja o seu"))
 		return
 	}
 
@@ -122,7 +135,7 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	repository := repositories.NewUsersRepository(db)
-	if err = repository.Update(userId, user); err != nil {
+	if err = repository.Update(userID, user); err != nil {
 		responses.Error(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -132,8 +145,21 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
-	userId, err := strconv.ParseUint(params["userId"], 10, 64)
+	userID, err := strconv.ParseUint(params["userId"], 10, 64)
+	if err != nil {
+		responses.Error(w, http.StatusBadRequest, err)
+		return
+	}
 
+	userIDFromToken, err := authentication.ExtractUserId(r)
+	if err != nil {
+		responses.Error(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if userID != userIDFromToken {
+		responses.Error(w, http.StatusForbidden, errors.New("Não é possível deletar um usuário que não seja o seu"))
+	}
 	db, err := database.Connect()
 	if err != nil {
 		responses.Error(w, http.StatusInternalServerError, err)
@@ -142,7 +168,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	repository := repositories.NewUsersRepository(db)
-	if err = repository.Delete(userId); err != nil {
+	if err = repository.Delete(userID); err != nil {
 		responses.Error(w, http.StatusInternalServerError, err)
 		return
 	}

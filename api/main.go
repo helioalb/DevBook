@@ -12,6 +12,6 @@ func main() {
 	config.Load()
 	r := router.Build()
 
-	fmt.Printf("Listen on port %d", config.Port)
+	fmt.Printf("Listen on port %d\n", config.Port)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", config.Port), r))
 }
